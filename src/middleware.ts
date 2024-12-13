@@ -1,17 +1,17 @@
 // TODO: Implement the code here to add rate limiting with Redis
 // Refer to the Next.js Docs: https://nextjs.org/docs/app/building-your-application/routing/middleware
 // Refer to Redis docs on Rate Limiting: https://upstash.com/docs/redis/sdks/ratelimit-ts/algorithms
-//hello
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+
+export async function middleware(url:string) {
   try {
-
-    const response = NextResponse.next();
-
-    return response;
-
+    // const cachedResponse = await redis.get(url)
+    // if (cachedResponse){
+    //   return
+    // }
+    
 
 
   } catch (error) {

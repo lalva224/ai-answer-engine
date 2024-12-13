@@ -5,12 +5,24 @@
 // Refer to Puppeteer docs here: https://pptr.dev/guides/what-is-puppeteer
 import Groq from 'groq-sdk';
 import axios from 'axios';
+import { Redis } from '@upstash/redis'
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN
+})
 
 const client = new Groq({
   apiKey: process.env['GROQ_API_KEY'], // This is the default and can be omitted
 });
 
 async function scrape_LLM_response(prompt: string,URL: string) {
+  //check if in cache first, if so return cached response
+  const cachedResponse = await redis.get(URL)
+  if (cachedResponse){
+    return cachedResponse
+  }
+  //if not perform scraping, llm completion and then cache result
   const finalURL = `https://r.jina.ai/${URL}`
   const JINA_API_KEY = process.env['JINA_API_KEY'];
   const response = await axios.post(finalURL, null, {
@@ -26,13 +38,15 @@ async function scrape_LLM_response(prompt: string,URL: string) {
    const chatCompletion = await client.chat.completions.create({
     messages: [{role:'system',content:query}],
     model: 'llama3-8b-8192',})
-    return chatCompletion.choices[0].message.content
+    //cache the response for future use
+    const res = chatCompletion.choices[0].message.content
+    await redis.set(URL,res,{ex:604800})
+    return res
   }
   catch(error: any){
-    console.log('inside error')
     //the article exceeds context window, so we recursively call a function with a smaller chunk size
-      console.log('inside')
      
+
 
         const chunkSize = 20000
         const responses = []
@@ -45,7 +59,10 @@ async function scrape_LLM_response(prompt: string,URL: string) {
           })
           responses.push(chatCompletion.choices[0].message.content)
         }
-        return responses.join('\n\n')
+        //cache the response for future use
+        const result = responses.join('\n\n')
+        await redis.set(URL,result,{ex:604800})
+        return result
        
 
         
@@ -78,7 +95,7 @@ export async function POST(req: Request) {
       return scraped_data
     }))
     //combine the seprate LLM responses per URL into 1 message
-    // context = [...context,...websiteDataResponses.map((data)=>{return {role:'system',content:data}})]
+    //need a better delimiter bc /n is not creating new lines
     const combinedMessage  = websiteDataResponses.join('--------------------------------------\n\n')
     return new Response(JSON.stringify({message:combinedMessage}))
 
