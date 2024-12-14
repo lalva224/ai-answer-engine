@@ -6,7 +6,7 @@
 import Groq from 'groq-sdk';
 import axios from 'axios';
 import { Redis } from '@upstash/redis'
-import { middleware } from '@/middleware';
+// import { middleware } from '@/middleware';
 import { NextRequest, NextResponse } from 'next/server';
 
 const redis = new Redis({
