@@ -3,30 +3,40 @@
 // Refer to Redis docs on Rate Limiting: https://upstash.com/docs/redis/sdks/ratelimit-ts/algorithms
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { Redis } from '@upstash/redis'
-import { Ratelimit } from "@upstash/ratelimit"; // for deno: see above
+import { Redis } from "@upstash/redis";
+import { Ratelimit } from "@upstash/ratelimit";
 
 const redis = Redis.fromEnv();
+const rateLimiter = new Ratelimit({
+  redis: redis,
+  analytics: true,
+  prefix: "rate-limit",
+  limiter: Ratelimit.slidingWindow(2, "60 s"),
+});
 
-// // Define the rate limiter for fixed window (10 requests per 10 seconds)
-// const ratelimit= new Ratelimit({
-//   redis, // Use Redis instance
-//   limiter: Ratelimit.slidingWindow(`0`, "10 s"), // 10 requests per 10 seconds
-//   analytics: true, // Optional: Enable analytics if needed
-// });
-// //this runs before home page
 export async function middleware(req: NextRequest) {
-  // const ip  = req.headers.get('x-forwarded-for') ?? '127.0.0.1'
-  // console.log(ip)
-  // const {success, remaining, reset} = await ratelimit.limit(ip);
-  // if (!success) {
-  //   console.log('RATE LIMIT EXCEEDED')
-  //   return NextResponse.json('Rate Limit Exceeded', { status: 429 });
-  // }
-  
-  // return NextResponse.json('Rate Limit Not Exceeded', { status: 200 });
-}
+  try {
+    const ip = req.headers.get("x-forwarded-for") ?? "127.0.0.1";
+    const { success, limit, remaining } = await rateLimiter.limit(ip);
+    const response = success
+      ? NextResponse.next()
+      : NextResponse.json(
+          { error: "Too many requests for you Salif" },
+          { status: 429 }
+        );
 
+    response.headers.set("X-RateLimit-Limit", limit.toString());
+    response.headers.set("X-RateLimit-Reset", limit.toString());
+    response.headers.set("X-RateLimit-Remaining", remaining.toString());
+    return response;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { error: "Internal server error " + error },
+      { status: 500 }
+    );
+  }
+}
 
 // Configure which paths the middleware runs on
 export const config = {
