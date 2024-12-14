@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Markdown from 'react-markdown'
+import rehypeHighlight from 'rehype-highlight'
 
 type Message = {
   role: "user" | "assistant";
@@ -60,7 +62,8 @@ export default function Home() {
       {/* Header */}
       <div className="w-full bg-gray-800 border-b border-gray-700 p-4">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-xl font-semibold text-white">Chat</h1>
+          <h1 className="text-xl font-semibold text-white text-center">AI Answer Engine</h1>
+          <p className ='text-sm font-semibold text-white text-center'>Summarize any web pages or articles!</p>
         </div>
       </div>
 
@@ -83,7 +86,8 @@ export default function Home() {
                     : "bg-cyan-600 text-white ml-auto"
                 }`}
               >
-                {msg.content}
+                <Markdown rehypePlugins={[rehypeHighlight]}>{msg.content}</Markdown>
+                
               </div>
             </div>
           ))}

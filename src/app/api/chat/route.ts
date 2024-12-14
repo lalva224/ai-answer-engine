@@ -6,6 +6,8 @@
 import Groq from 'groq-sdk';
 import axios from 'axios';
 import { Redis } from '@upstash/redis'
+import { middleware } from '@/middleware';
+import { NextRequest, NextResponse } from 'next/server';
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
@@ -31,7 +33,7 @@ async function scrape_LLM_response(prompt: string,URL: string) {
     },
   });
    const website_data = response.data; 
-  
+    console.log('website scraped')
    const query = `Do this${prompt} Here is the website data: ${website_data}`
    
    try{
@@ -46,7 +48,6 @@ async function scrape_LLM_response(prompt: string,URL: string) {
   catch(error: any){
     //the article exceeds context window, so we recursively call a function with a smaller chunk size
      
-
 
         const chunkSize = 20000
         const responses = []
@@ -63,11 +64,7 @@ async function scrape_LLM_response(prompt: string,URL: string) {
         const result = responses.join('\n\n')
         await redis.set(URL,result,{ex:604800})
         return result
-       
-
-        
       
-    
 
     
   }
@@ -81,11 +78,14 @@ function ExtractWebsite(prompt:string){
   //if websites found then return them else return null
   return websites ? websites : null
 }
-export async function POST(req: Request) {
+
+
+export async function POST(req: NextRequest) {
+
   let { context } = await req.json()
   //to scrape a website we need to check latest message and see if it has a .com .org  .net or others
   const lastMessage = context[context.length - 1].content
-  const non_url_prompt = lastMessage.replace(/(https?:\/\/[^\s]+)/g,'')
+  const non_url_prompt = lastMessage.replace(/(https?:\/\/[^\s]+)/g,'') + "Please don't forget to do this in markdown format" 
   const websites = ExtractWebsite(lastMessage)
   if(websites){
     //this way its done asyncrhonously over a simple for loop
@@ -96,13 +96,15 @@ export async function POST(req: Request) {
     }))
     //combine the seprate LLM responses per URL into 1 message
     //need a better delimiter bc /n is not creating new lines
-    const combinedMessage  = websiteDataResponses.join('--------------------------------------\n\n')
+    const combinedMessage  = websiteDataResponses.join('\n\n\---\n\n')
     return new Response(JSON.stringify({message:combinedMessage}))
 
     
   }
 
   //if not websites we let the LLM answer the general question with its known context
+
+  context = [...context, {role:'system',content:"don't forget to do this in markdown format"}]
   try {
     const chatCompletion = await client.chat.completions.create({
       messages: context,
