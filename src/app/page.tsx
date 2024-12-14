@@ -8,7 +8,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
 };
-
+//need to add this for commit
 export default function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([
